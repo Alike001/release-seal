@@ -85,8 +85,12 @@ export function GasMirror() {
   );
   const requestedGas = useMemo(() => {
     if (gasMode === "wallet") return undefined;
-    const value = BigInt(customGasText || "0");
-    return value > 0n ? value : undefined;
+    try {
+      const value = BigInt(customGasText || "0");
+      return value > 0n ? value : undefined;
+    } catch {
+      return undefined;
+    }
   }, [customGasText, gasMode]);
 
   const onExpectedChain = chainId === monadChain.id;
