@@ -9,11 +9,9 @@ export const publicClient = createPublicClient({
   transport: http(monadRpcUrl),
 });
 
-export const probeAddress = process.env.NEXT_PUBLIC_GAS_PROBE_ADDRESS as
-  Address | undefined;
-export const expectedProbeRuntimeHash = process.env
-  .NEXT_PUBLIC_GAS_PROBE_RUNTIME_HASH as `0x${string}` | undefined;
-export const probeDeploymentBlock = process.env
-  .NEXT_PUBLIC_GAS_PROBE_DEPLOYMENT_BLOCK
-  ? BigInt(process.env.NEXT_PUBLIC_GAS_PROBE_DEPLOYMENT_BLOCK)
-  : undefined;
+// This is immutable public chain identity, not user configuration.
+export const probeAddress =
+  "0xDe7D3BA3A42643164378fa64B72dA5cBe9C9369c" as Address;
+export const expectedProbeRuntimeHash =
+  "0x90857816f72eedd2d66537f6c9ecf19a9e7eb4b8c697c14972a8f0ae0352ef30" as const;
+export const probeDeploymentBlock = 45_202_395n;
