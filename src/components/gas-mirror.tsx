@@ -81,7 +81,7 @@ export function GasMirror() {
   const isConnected = clientReady && restoredConnected;
   const { connectors, connect, isPending: isConnecting } = useConnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
-  const { data: hash, writeContractAsync, error } = useWriteContract();
+  const { data: hash, reset, writeContractAsync, error } = useWriteContract();
   const receipt = useWaitForTransactionReceipt({ hash });
 
   const [verification, setVerification] = useState<Verification>("checking");
@@ -96,6 +96,7 @@ export function GasMirror() {
   );
   const [completedRun, setCompletedRun] = useState<CompletedRun>();
   const [finalityRefresh, setFinalityRefresh] = useState(0);
+  const [estimateRequest, setEstimateRequest] = useState(0);
 
   const iterations = useMemo(
     () => numberFromInput(iterationsText),
@@ -199,7 +200,7 @@ export function GasMirror() {
     return () => {
       active = false;
     };
-  }, [address, canEstimate, iterations]);
+  }, [address, canEstimate, estimateRequest, iterations]);
 
   useEffect(() => {
     if (
@@ -387,6 +388,16 @@ export function GasMirror() {
     }
   }
 
+  function runAgain() {
+    reset();
+    setCompletedRun(undefined);
+    setEstimate(undefined);
+    setRunId(undefined);
+    setState("ready");
+    setNotice("Preparing a new live estimate for the next calibration.");
+    setEstimateRequest((value) => value + 1);
+  }
+
   const billing = completedRun
     ? calculateBilling({
         rpcEstimateGas: completedRun.estimate,
@@ -530,7 +541,11 @@ export function GasMirror() {
           {notice}
           {error ? ` ${error.message}` : ""}
         </p>
-        {!isConnected ? (
+        {completedRun ? (
+          <button className="primary" onClick={runAgain}>
+            RUN AGAIN
+          </button>
+        ) : !isConnected ? (
           <button
             className="primary"
             onClick={() => connect({ connector: connectors[0] })}
