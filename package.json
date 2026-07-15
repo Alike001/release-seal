@@ -1,0 +1,29 @@
+{
+  "name": "runway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "format:check": "prettier --check package.json spike",
+    "typecheck": "tsc -p spike/tsconfig.json --noEmit",
+    "test": "vitest run spike",
+    "build": "tsc -p spike/tsconfig.json",
+    "contracts:fmt": "forge fmt --check --root contracts",
+    "contracts:build": "forge build --root contracts",
+    "contracts:test": "forge test --root contracts"
+  },
+  "dependencies": {
+    "@metamask/smart-accounts-kit": "1.6.0",
+    "viem": "2.55.2"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "prettier": "3.9.5",
+    "tsx": "4.23.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}
