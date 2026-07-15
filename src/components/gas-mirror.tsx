@@ -15,7 +15,7 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import {
   expectedProbeRuntimeHash,
@@ -60,8 +60,24 @@ function numberFromInput(value: string) {
     : undefined;
 }
 
+function useClientReady() {
+  return useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+}
+
 export function GasMirror() {
-  const { address, chainId, isConnected } = useAccount();
+  const {
+    address: restoredAddress,
+    chainId: restoredChainId,
+    isConnected: restoredConnected,
+  } = useAccount();
+  const clientReady = useClientReady();
+  const address = clientReady ? restoredAddress : undefined;
+  const chainId = clientReady ? restoredChainId : undefined;
+  const isConnected = clientReady && restoredConnected;
   const { connectors, connect, isPending: isConnecting } = useConnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const { data: hash, writeContractAsync, error } = useWriteContract();
