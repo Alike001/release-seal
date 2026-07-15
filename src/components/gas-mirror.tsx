@@ -36,6 +36,7 @@ type RunState =
   | "awaiting-signature"
   | "submitted"
   | "reading-receipt"
+  | "waiting-finality"
   | "evidence-verified"
   | "cannot-verify"
   | "conflicting-evidence"
@@ -94,6 +95,7 @@ export function GasMirror() {
     "Connect a wallet to prepare a live calibration.",
   );
   const [completedRun, setCompletedRun] = useState<CompletedRun>();
+  const [finalityRefresh, setFinalityRefresh] = useState(0);
 
   const iterations = useMemo(
     () => numberFromInput(iterationsText),
@@ -120,6 +122,14 @@ export function GasMirror() {
     (requestedGas !== undefined &&
       estimate !== undefined &&
       requestedGas >= estimate);
+
+  useEffect(() => {
+    if (!receipt.data || state !== "waiting-finality") return;
+    const interval = window.setInterval(() => {
+      setFinalityRefresh((value) => value + 1);
+    }, 4_000);
+    return () => window.clearInterval(interval);
+  }, [receipt.data, state]);
 
   useEffect(() => {
     let active = true;
@@ -297,7 +307,12 @@ export function GasMirror() {
           },
         );
         if (!active) return;
-        const finalState = evidenceState as RunState;
+        const finalState: RunState =
+          evidenceState === "pending"
+            ? "waiting-finality"
+            : evidenceState === "replaced"
+              ? "cannot-verify"
+              : evidenceState;
         setCompletedRun({
           hash: transactionHash,
           estimate: rpcEstimate,
@@ -313,7 +328,9 @@ export function GasMirror() {
         setNotice(
           finalState === "evidence-verified"
             ? "EVIDENCE VERIFIED from the signed transaction, receipt, probe event, and finalized block."
-            : `CANNOT VERIFY: ${finalState.replaceAll("-", " ")}.`,
+            : finalState === "waiting-finality"
+              ? "WAITING FOR FINALITY: receipt recorded; rechecking the finalized Monad block every 4 seconds."
+              : `CANNOT VERIFY: ${finalState.replaceAll("-", " ")}.`,
         );
       } catch {
         if (active) {
@@ -326,7 +343,16 @@ export function GasMirror() {
     return () => {
       active = false;
     };
-  }, [address, estimate, hash, iterations, receipt.data, runId, verification]);
+  }, [
+    address,
+    estimate,
+    finalityRefresh,
+    hash,
+    iterations,
+    receipt.data,
+    runId,
+    verification,
+  ]);
 
   async function runCalibration() {
     if (
