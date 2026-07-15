@@ -13,6 +13,9 @@ spike/dist/
 *.tsbuildinfo
 
 # Foundry
+cache/
+out/
+broadcast/
 contracts/cache/
 contracts/out/
 contracts/broadcast/

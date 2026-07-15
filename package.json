@@ -15,9 +15,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "contracts:fmt": "forge fmt --check --root contracts",
-    "contracts:build": "forge build --root contracts",
-    "contracts:test": "forge test --root contracts"
+    "contracts:fmt": "forge fmt --check",
+    "contracts:build": "forge build",
+    "contracts:test": "forge test"
   },
   "dependencies": {
     "@tanstack/react-query": "5.101.2",
