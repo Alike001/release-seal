@@ -20,6 +20,8 @@ An exact match is release evidence, **not** a security audit, an endorsement, or
 
 No environment variables or API keys are required for the read-only flow.
 
+**Live demo:** [spark-pi-hazel.vercel.app](https://spark-pi-hazel.vercel.app)
+
 ```bash
 npm ci
 npm run dev
