@@ -57,6 +57,9 @@ export const releaseSealRegistryAbi = [
 export const releaseSealRegistryAddress =
   "0x34e6115D585A22B176Cb4F664da389aB8cC8b7b4" as const satisfies Address;
 
+export const releaseSealRegistryRuntimeHash =
+  "0xbeba792ad0de3adb3698cdfb49cb439a65736c88289f2e824edcc943f0407199" as const satisfies Hex;
+
 export const firstReleaseSealId =
   "0x53d2b1c05305211e12e191e76c95e3e88119a1d9b5d14c60131695940b31abec" as const satisfies Hex;
 

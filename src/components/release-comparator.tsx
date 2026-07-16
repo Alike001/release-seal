@@ -23,6 +23,7 @@ import type {
   LiveComparison,
   SourcifyEvidence,
 } from "@/lib/release-seal-types";
+import { loadSelfCheckArtifact, selfCheckTarget } from "@/lib/self-check";
 import { fetchSourcifyEvidence, unavailableEvidence } from "@/lib/sourcify";
 
 type ComparisonState =
@@ -153,12 +154,11 @@ export function ReleaseComparator() {
     setComparison({ status: "idle" });
   }
 
-  async function compare(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!artifact || !isAddress(addressText.trim())) return;
-
-    const request = ++requestSequence.current;
-    const address = getAddress(addressText.trim()) as Address;
+  async function compareEvidence(
+    expectedArtifact: ArtifactEvidence,
+    address: Address,
+    request: number,
+  ) {
     setComparison({ status: "checking" });
 
     const [codeResult, sourceEvidence] = await Promise.all([
@@ -183,11 +183,45 @@ export function ReleaseComparator() {
       status: "complete",
       value: {
         address,
-        runtime: compareRuntime(artifact.runtime, codeResult.code),
+        runtime: compareRuntime(expectedArtifact.runtime, codeResult.code),
         source: sourceEvidence,
       },
     });
     revealResult();
+  }
+
+  async function compare(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!artifact || !isAddress(addressText.trim())) return;
+
+    const request = ++requestSequence.current;
+    const address = getAddress(addressText.trim()) as Address;
+    await compareEvidence(artifact, address, request);
+  }
+
+  async function verifyReleaseSeal() {
+    const request = ++requestSequence.current;
+    setArtifact(undefined);
+    setArtifactError(undefined);
+    setArtifactStatus("parsing");
+    setAddressText(selfCheckTarget);
+    setComparison({ status: "idle" });
+
+    try {
+      const selfCheckArtifact = await loadSelfCheckArtifact();
+      if (request !== requestSequence.current) return;
+      setArtifact(selfCheckArtifact);
+      setArtifactStatus("valid");
+      await compareEvidence(selfCheckArtifact, selfCheckTarget, request);
+    } catch (error) {
+      if (request !== requestSequence.current) return;
+      setArtifactStatus("invalid");
+      setArtifactError(
+        error instanceof Error
+          ? error.message
+          : "ReleaseSeal's published artifact could not be loaded.",
+      );
+    }
   }
 
   const evidenceState: ComparisonMarkState =
@@ -228,10 +262,39 @@ export function ReleaseComparator() {
         onSubmit={compare}
         aria-busy={comparison.status === "checking"}
       >
+        <section className="purpose-band" aria-labelledby="purpose-heading">
+          <div className="purpose-copy">
+            <h1 id="purpose-heading">
+              Prove that the build on your computer is the code live on Monad.
+            </h1>
+            <p>
+              Compare a Foundry artifact with fresh runtime bytecode, then
+              record the exact match onchain.
+            </p>
+          </div>
+          <div className="self-check-band">
+            <button
+              type="button"
+              onClick={() => void verifyReleaseSeal()}
+              disabled={
+                artifactStatus === "parsing" || comparison.status === "checking"
+              }
+              aria-describedby="self-check-detail"
+            >
+              {artifactStatus === "parsing" || comparison.status === "checking"
+                ? "VERIFYING RELEASESEAL…"
+                : "VERIFY RELEASESEAL ITSELF"}
+            </button>
+            <span id="self-check-detail">
+              REAL PUBLISHED ARTIFACT · LIVE MONAD RPC · SOURCIFY
+            </span>
+          </div>
+        </section>
+
         <section className="input-stage" aria-label="Release inputs">
           <div className="intake intake-local">
             <p className="plane-label">LOCAL BUILD</p>
-            <h1>Choose the build you meant to release.</h1>
+            <h2>Choose the build you meant to release.</h2>
             <div
               className={`artifact-drop artifact-drop-${artifactStatus}`}
               onDragOver={(event) => event.preventDefault()}
@@ -360,19 +423,6 @@ export function ReleaseComparator() {
             state={evidenceState}
           />
         </section>
-
-        {comparison.status === "idle" ? (
-          <div className="self-check-band">
-            <button
-              type="button"
-              disabled
-              title="Available after registry deployment"
-            >
-              VERIFY RELEASESEAL ITSELF
-            </button>
-            <span>UNLOCKS AFTER THE SOURCE-VERIFIED REGISTRY DEPLOYMENT</span>
-          </div>
-        ) : null}
       </form>
 
       <div className="result-live-region" aria-live="polite">
