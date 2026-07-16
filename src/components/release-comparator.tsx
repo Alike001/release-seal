@@ -70,6 +70,13 @@ function runtimeBytes(state: ComparisonState) {
     : `${state.value.runtime.observedBytes.toLocaleString("en-US")} BYTES`;
 }
 
+function observationValue(state: ComparisonState) {
+  if (state.status === "checking") return "READING FINALIZED BLOCK";
+  if (state.status === "rpc-error") return "NOT AVAILABLE";
+  if (state.status !== "complete") return "NOT CHECKED";
+  return `FINALIZED BLOCK ${state.value.observedFinalizedBlock.toString()}`;
+}
+
 function contractCode(state: ComparisonState) {
   if (state.status === "checking") return "READING CONTRACT CODE";
   if (state.status === "rpc-error") return "RPC READ FAILED";
@@ -102,6 +109,9 @@ export function ReleaseComparator() {
   const [comparison, setComparison] = useState<ComparisonState>({
     status: "idle",
   });
+  const [rpcState, setRpcState] = useState<
+    "unchecked" | "reading" | "live" | "unavailable"
+  >("unchecked");
 
   const addressIsValid = isAddress(addressText.trim());
   const canCompare = Boolean(artifact) && addressIsValid;
@@ -160,13 +170,32 @@ export function ReleaseComparator() {
     request: number,
   ) {
     setComparison({ status: "checking" });
+    setRpcState("reading");
+
+    const sourcePromise = fetchSourcifyEvidence(address);
+    const finalizedBlock = await publicClient
+      .getBlock({ blockTag: "finalized" })
+      .then((block) => ({ ok: true as const, block }))
+      .catch(() => ({ ok: false as const }));
+
+    if (!finalizedBlock.ok) {
+      const sourceEvidence = await sourcePromise;
+      if (request !== requestSequence.current) return;
+      setComparison({
+        status: "rpc-error",
+        source: sourceEvidence ?? unavailableEvidence(),
+      });
+      setRpcState("unavailable");
+      revealResult();
+      return;
+    }
 
     const [codeResult, sourceEvidence] = await Promise.all([
       publicClient
-        .getCode({ address })
+        .getCode({ address, blockNumber: finalizedBlock.block.number })
         .then((code) => ({ ok: true as const, code }))
         .catch(() => ({ ok: false as const })),
-      fetchSourcifyEvidence(address),
+      sourcePromise,
     ]);
 
     if (request !== requestSequence.current) return;
@@ -175,6 +204,7 @@ export function ReleaseComparator() {
         status: "rpc-error",
         source: sourceEvidence ?? unavailableEvidence(),
       });
+      setRpcState("unavailable");
       revealResult();
       return;
     }
@@ -185,8 +215,10 @@ export function ReleaseComparator() {
         address,
         runtime: compareRuntime(expectedArtifact.runtime, codeResult.code),
         source: sourceEvidence,
+        observedFinalizedBlock: finalizedBlock.block.number,
       },
     });
+    setRpcState("live");
     revealResult();
   }
 
@@ -238,7 +270,14 @@ export function ReleaseComparator() {
           [release] = [seal]
         </a>
         <span className="network-state">
-          {monadChain.name.toUpperCase()} · LIVE RPC
+          {monadChain.name.toUpperCase()} ·{" "}
+          {rpcState === "live"
+            ? "FINALIZED RPC LIVE"
+            : rpcState === "reading"
+              ? "READING RPC"
+              : rpcState === "unavailable"
+                ? "RPC UNAVAILABLE"
+                : "RPC UNCHECKED"}
         </span>
         <nav aria-label="ReleaseSeal utility navigation">
           <a href="#record">RECORD</a>
@@ -418,8 +457,8 @@ export function ReleaseComparator() {
             localLabel="ARTIFACT FILE HASH"
             localValue={display(artifact?.artifactFileHash)}
             localDetail={artifact?.artifactFileHash}
-            chainLabel="SOURCIFY MATCH ID"
-            chainValue={display(source?.matchId ?? undefined)}
+            chainLabel="OBSERVED AT"
+            chainValue={observationValue(comparison)}
             state={evidenceState}
           />
         </section>
@@ -432,6 +471,7 @@ export function ReleaseComparator() {
             source={comparison.value.source}
             artifactFileHash={artifact.artifactFileHash}
             target={comparison.value.address}
+            observedFinalizedBlock={comparison.value.observedFinalizedBlock}
           />
         ) : comparison.status === "rpc-error" ? (
           <RpcErrorDrawer source={comparison.source} />

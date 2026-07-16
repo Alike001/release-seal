@@ -27,11 +27,13 @@ export function EvidenceDrawer({
   source,
   artifactFileHash,
   target,
+  observedFinalizedBlock,
 }: {
   runtime: RuntimeComparison;
   source: SourcifyEvidence;
   artifactFileHash: Hex;
   target: Address;
+  observedFinalizedBlock: bigint;
 }) {
   const exact = runtime.outcome === "exact";
   const publishEligible = exact && source.state === "verified";
@@ -103,6 +105,10 @@ export function EvidenceDrawer({
                 : ` · ONCHAIN ${runtime.observedBytes.toLocaleString("en-US")}`}
             </dd>
           </div>
+          <div>
+            <dt>OBSERVED AT</dt>
+            <dd>MONAD FINALIZED BLOCK {observedFinalizedBlock.toString()}</dd>
+          </div>
           {runtime.outcome === "differs" ? (
             <div>
               <dt>FIRST DIFFERING BYTE</dt>
@@ -149,7 +155,8 @@ export function EvidenceDrawer({
 
       <p className="method-note" id="method">
         <strong>METHOD</strong> Keccak-256 of the complete deployed runtime
-        bytecode. Matching code is not a safety or audit verdict.
+        bytecode read at the displayed finalized Monad block. Matching code is
+        not a safety or audit verdict.
       </p>
     </section>
   );

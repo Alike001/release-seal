@@ -757,6 +757,22 @@ input:focus-visible {
   line-height: 1.5;
 }
 
+.finality-retry-button {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+  border: 1px solid var(--primitive-obsidian-950);
+  background: transparent;
+  color: var(--primitive-obsidian-950);
+  cursor: pointer;
+  font: 800 10px/1 var(--font-mono);
+  letter-spacing: 0.07em;
+}
+
+.finality-retry-button:hover {
+  background: var(--status-active);
+}
+
 .proxy-warning {
   padding: 12px 14px;
   border-left: 4px solid var(--status-differs);
@@ -889,6 +905,14 @@ input:focus-visible {
   color: var(--status-exact);
 }
 
+.record-finalized {
+  margin: 0;
+  padding: 0 0 14px;
+  color: var(--status-active);
+  font: 800 11px/17px var(--font-mono);
+  letter-spacing: 0.07em;
+}
+
 .record-bad {
   color: var(--status-differs);
 }
@@ -925,6 +949,93 @@ input:focus-visible {
   line-height: 1.5;
 }
 
+.record-external-link {
+  color: var(--status-active);
+  text-decoration-color: currentColor;
+  text-underline-offset: 3px;
+}
+
+.artifact-reproduction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.7fr);
+  gap: 22px;
+  margin-top: 28px;
+  padding: 20px;
+  border: 1px solid var(--rule-on-chain);
+  background: var(--surface-chain-raised);
+}
+
+.artifact-reproduction .plane-label {
+  margin-bottom: 9px;
+  color: var(--status-active);
+}
+
+.artifact-reproduction h3 {
+  margin: 0;
+  font: 600 22px/28px var(--font-sans);
+  letter-spacing: -0.03em;
+}
+
+.artifact-reproduction p:not(.plane-label) {
+  max-width: 580px;
+  margin: 10px 0 0;
+  color: var(--text-muted-chain);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.reproduction-input {
+  position: relative;
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid var(--status-active);
+  color: var(--text-on-chain);
+  cursor: pointer;
+}
+
+.reproduction-input input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.reproduction-input span {
+  font: 800 11px/16px var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+.reproduction-input small {
+  color: var(--text-muted-chain);
+  font: 600 9px/13px var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+.reproduction-good,
+.reproduction-bad {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule-on-chain);
+  font: 800 11px/16px var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+.reproduction-good {
+  color: var(--status-exact);
+}
+
+.reproduction-bad {
+  color: var(--status-differs);
+}
+
 @media (max-width: 1100px) {
   .evidence-cell {
     grid-template-columns: minmax(120px, 0.38fr) minmax(0, 1fr);
@@ -939,6 +1050,10 @@ input:focus-visible {
     align-items: start;
     flex-direction: column;
     gap: 14px;
+  }
+
+  .artifact-reproduction {
+    grid-template-columns: 1fr;
   }
 }
 

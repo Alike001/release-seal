@@ -65,4 +65,5 @@ export type LiveComparison = {
   address: Address;
   runtime: RuntimeComparison;
   source: SourcifyEvidence;
+  observedFinalizedBlock: bigint;
 };

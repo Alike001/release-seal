@@ -1,9 +1,15 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import type { Address, Hex } from "viem";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  type BaseError,
+  BaseError,
+  ContractFunctionRevertedError,
+  type Address,
+  type Hex,
+} from "viem";
+import {
   useAccount,
   useConnect,
   useSimulateContract,
@@ -13,10 +19,12 @@ import {
 } from "wagmi";
 
 import { monadChain } from "@/lib/chain";
+import { publicClient } from "@/lib/chain";
 import {
   releaseSealRegistryAbi,
   releaseSealRegistryAddress,
 } from "@/lib/release-seal-registry";
+import { isFinalizedSealBlock } from "@/lib/seal-record";
 
 const subscribeToHydration = () => () => undefined;
 
@@ -36,6 +44,33 @@ function errorMessage(error: Error | null | undefined) {
   return (error as BaseError | undefined)?.shortMessage ?? error?.message;
 }
 
+function simulationFailure(error: Error | null | undefined) {
+  if (!(error instanceof BaseError)) return undefined;
+  const revertError = error.walk(
+    (entry) => entry instanceof ContractFunctionRevertedError,
+  );
+  if (!(revertError instanceof ContractFunctionRevertedError)) {
+    return undefined;
+  }
+
+  if (revertError.data?.errorName === "DuplicateSeal") {
+    const sealId = revertError.data.args?.[0];
+    return typeof sealId === "string" && sealId.startsWith("0x")
+      ? { kind: "duplicate" as const, sealId }
+      : { kind: "duplicate" as const };
+  }
+  if (revertError.data?.errorName === "RuntimeHashMismatch") {
+    return { kind: "runtime-mismatch" as const };
+  }
+  if (revertError.data?.errorName === "TargetHasNoCode") {
+    return { kind: "no-code" as const };
+  }
+  if (revertError.data?.errorName === "ZeroEvidence") {
+    return { kind: "zero-evidence" as const };
+  }
+  return undefined;
+}
+
 export function WalletSealGate({
   publishEligible,
   target,
@@ -49,6 +84,7 @@ export function WalletSealGate({
   artifactFileHash: Hex;
   releaseId: Hex;
 }) {
+  const router = useRouter();
   const hydrated = useHydrated();
   const { address, chainId, isConnected } = useAccount();
   const {
@@ -87,8 +123,52 @@ export function WalletSealGate({
     data: receipt,
     error: receiptError,
     isLoading: isConfirming,
-    isSuccess: isConfirmed,
+    isSuccess: hasReceipt,
   } = useWaitForTransactionReceipt({ hash: transactionHash });
+  const [publicationState, setPublicationState] = useState<
+    "idle" | "finalized" | "finality-error"
+  >("idle");
+  const [finalityError, setFinalityError] = useState<string>();
+  const [finalityAttempt, setFinalityAttempt] = useState(0);
+  const preflightFailure = simulationFailure(simulationError);
+
+  useEffect(() => {
+    if (!hasReceipt || !receipt || !simulatedSeal?.result) return;
+
+    const receiptBlockNumber = receipt.blockNumber;
+    const sealId = simulatedSeal.result;
+
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    async function checkFinality() {
+      try {
+        const finalizedBlock = await publicClient.getBlock({
+          blockTag: "finalized",
+        });
+        if (cancelled) return;
+
+        if (isFinalizedSealBlock(receiptBlockNumber, finalizedBlock.number)) {
+          setPublicationState("finalized");
+          router.push(`/seal/${sealId}`);
+          return;
+        }
+
+        timeout = setTimeout(() => void checkFinality(), 450);
+      } catch (error) {
+        if (cancelled) return;
+        setPublicationState("finality-error");
+        setFinalityError(errorMessage(error as Error));
+      }
+    }
+
+    void checkFinality();
+    return () => {
+      cancelled = true;
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [finalityAttempt, hasReceipt, receipt, router, simulatedSeal?.result]);
+
+  const awaitingFinality = hasReceipt && publicationState === "idle";
 
   if (!publishEligible) {
     return (
@@ -188,22 +268,47 @@ export function WalletSealGate({
           <button
             className="publish-button"
             type="button"
-            disabled={isSigning || isConfirming || isConfirmed}
+            disabled={isSigning || isConfirming || hasReceipt}
             onClick={() => writeContract(simulatedSeal.request)}
           >
             {isSigning
               ? "AWAITING WALLET…"
               : isConfirming
                 ? "WAITING FOR RECEIPT…"
-                : isConfirmed
-                  ? "SEAL RECORDED"
-                  : "PUBLISH SEAL"}
+                : awaitingFinality
+                  ? "WAITING FOR MONAD FINALITY…"
+                  : publicationState === "finalized"
+                    ? "OPENING PUBLIC RECORD…"
+                    : "PUBLISH SEAL"}
           </button>
           <p>
             This opens your wallet with the simulated request only after you
             click. Publishing creates one public, permanent testnet seal.
           </p>
         </>
+      ) : preflightFailure?.kind === "duplicate" ? (
+        <p className="wallet-error">
+          THIS EXACT RELEASE IS ALREADY SEALED BY THIS WALLET. A duplicate is
+          rejected so one evidence tuple has one public record.{" "}
+          {preflightFailure.sealId ? (
+            <Link href={`/seal/${preflightFailure.sealId}`}>
+              OPEN EXISTING RECORD
+            </Link>
+          ) : null}
+        </p>
+      ) : preflightFailure?.kind === "runtime-mismatch" ? (
+        <p className="wallet-error">
+          PREFLIGHT REJECTED — the target&apos;s current runtime changed before
+          publication. Run the comparison again.
+        </p>
+      ) : preflightFailure?.kind === "no-code" ? (
+        <p className="wallet-error">
+          PREFLIGHT REJECTED — the target address has no contract code.
+        </p>
+      ) : preflightFailure?.kind === "zero-evidence" ? (
+        <p className="wallet-error">
+          PREFLIGHT REJECTED — one or more required evidence values are empty.
+        </p>
       ) : simulationError ? (
         <p className="wallet-error">
           PREFLIGHT REVERTED — {simulationError.message}
@@ -226,11 +331,33 @@ export function WalletSealGate({
           RECEIPT FAILED — {errorMessage(receiptError)}
         </p>
       ) : null}
-      {isConfirmed && receipt && simulatedSeal?.result ? (
+      {hasReceipt && receipt && simulatedSeal?.result ? (
         <p className="transaction-success">
-          SEAL RECORDED · ID {simulatedSeal.result} · BLOCK{" "}
-          {receipt.blockNumber.toString()}
+          INCLUDED IN BLOCK {receipt.blockNumber.toString()} —{" "}
+          {awaitingFinality
+            ? "waiting for Monad finality before the public record opens."
+            : publicationState === "finalized"
+              ? "finalized; opening the public record."
+              : "receipt is available; finality check is starting."}
         </p>
+      ) : null}
+      {publicationState === "finality-error" ? (
+        <div className="finality-retry">
+          <p className="wallet-error">
+            FINALITY CHECK UNAVAILABLE — {finalityError ?? "Try again shortly."}
+          </p>
+          <button
+            className="finality-retry-button"
+            type="button"
+            onClick={() => {
+              setFinalityError(undefined);
+              setPublicationState("idle");
+              setFinalityAttempt((attempt) => attempt + 1);
+            }}
+          >
+            RETRY FINALITY CHECK
+          </button>
+        </div>
       ) : null}
     </>
   );

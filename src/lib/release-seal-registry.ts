@@ -6,7 +6,45 @@ import {
   type Hex,
 } from "viem";
 
+export const releaseSealedEvent = {
+  type: "event",
+  name: "ReleaseSealed",
+  anonymous: false,
+  inputs: [
+    { name: "sealId", type: "bytes32", indexed: true },
+    { name: "issuer", type: "address", indexed: true },
+    { name: "target", type: "address", indexed: true },
+    { name: "runtimeHash", type: "bytes32", indexed: false },
+    { name: "artifactFileHash", type: "bytes32", indexed: false },
+    { name: "releaseId", type: "bytes32", indexed: false },
+    { name: "blockNumber", type: "uint64", indexed: false },
+  ],
+} as const;
+
 export const releaseSealRegistryAbi = [
+  {
+    type: "error",
+    name: "DuplicateSeal",
+    inputs: [{ name: "sealId", type: "bytes32" }],
+  },
+  {
+    type: "error",
+    name: "RuntimeHashMismatch",
+    inputs: [
+      { name: "claimed", type: "bytes32" },
+      { name: "observed", type: "bytes32" },
+    ],
+  },
+  {
+    type: "error",
+    name: "TargetHasNoCode",
+    inputs: [{ name: "target", type: "address" }],
+  },
+  {
+    type: "error",
+    name: "ZeroEvidence",
+    inputs: [],
+  },
   {
     type: "function",
     name: "seal",
@@ -52,6 +90,7 @@ export const releaseSealRegistryAbi = [
       },
     ],
   },
+  releaseSealedEvent,
 ] as const satisfies Abi;
 
 export const releaseSealRegistryAddress =

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { encodeFunctionData, zeroAddress } from "viem";
+import {
+  decodeErrorResult,
+  encodeErrorResult,
+  encodeFunctionData,
+  zeroAddress,
+} from "viem";
 
 import {
   deriveReleaseId,
@@ -33,5 +38,23 @@ describe("releaseSealRegistryAbi", () => {
     expect(releaseSealRegistryAddress).toBe(
       "0x34e6115D585A22B176Cb4F664da389aB8cC8b7b4",
     );
+  });
+
+  it("decodes the registry's duplicate-seal error", () => {
+    const sealId =
+      "0x1111111111111111111111111111111111111111111111111111111111111111";
+    const data = encodeErrorResult({
+      abi: releaseSealRegistryAbi,
+      errorName: "DuplicateSeal",
+      args: [sealId],
+    });
+
+    expect(data.slice(0, 10)).toBe("0x9d0d46f2");
+    expect(
+      decodeErrorResult({ abi: releaseSealRegistryAbi, data }),
+    ).toMatchObject({
+      errorName: "DuplicateSeal",
+      args: [sealId],
+    });
   });
 });

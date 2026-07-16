@@ -1,86 +1,78 @@
 # ReleaseSeal
 
-**ReleaseSeal lets a builder prove that a specific Foundry build artifact matches the code currently deployed at a Monad address, then record that exact evidence onchain.**
+ReleaseSeal lets a builder compare a local Foundry artifact with a deployed Monad contract, then store the exact release evidence in an onchain registry. A later shareable record shows the original seal event and repeats the code comparison at a current finalized Monad block.
 
-It answers one narrow release question: _did this local build produce the runtime bytecode that is actually live at this contract address right now?_
+## The release question it answers
 
-## What a judge can verify in 30 seconds
+“Is the build I meant to release the code that is actually deployed?”
 
-1. Select **Verify ReleaseSeal itself** to load the genuine published registry artifact and run fresh Monad and Sourcify checks without a wallet.
-2. ReleaseSeal displays a deterministic exact-match or mismatch result, with both hashes and byte counts.
-3. For another release, choose a Foundry artifact JSON file and paste its deployed Monad Testnet contract address.
-4. When the bytes match, connect a wallet to preflight and publish the same evidence through the live registry.
-5. Open **Record** and load the first public testnet seal to see the stored evidence compared with a fresh live-code read.
+ReleaseSeal gives that question three separate, checkable answers:
 
-The interface deliberately separates three different claims:
+| Evidence              | What it proves                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `EXACT RUNTIME MATCH` | The local artifact runtime bytecode equals the target runtime bytecode read at a displayed finalized Monad block.        |
+| `SOURCE VERIFIED`     | Sourcify independently reports its source-verification result for the target.                                            |
+| `SEALED ONCHAIN`      | The live registry read the target’s runtime hash itself and stored the supplied release evidence in a Monad transaction. |
 
-| Claim                 | What it means                                                                                            |
-| --------------------- | -------------------------------------------------------------------------------------------------------- |
-| `EXACT RUNTIME MATCH` | The local artifact runtime bytes equal the code freshly read from the target address.                    |
-| `SOURCE VERIFIED`     | Sourcify separately reports source-verification status for the target.                                   |
-| `SEALED ONCHAIN`      | The ReleaseSeal registry accepted and stored the evidence after checking the target's `codehash` itself. |
+An exact match is release evidence, **not** a security audit, an endorsement, or proof that the contract is safe.
 
-## Live Monad Testnet proof
+## Try it
 
-ReleaseSeal is connected to a live, ownerless registry on Monad Testnet (`10143`).
-
-| Evidence                  | Value                                                                                                                                        |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Registry                  | [`0x34e6115D585A22B176Cb4F664da389aB8cC8b7b4`](https://testnet.monadexplorer.com/address/0x34e6115D585A22B176Cb4F664da389aB8cC8b7b4)         |
-| Registry deployment       | [`0xf3ba…f4bf1`](https://testnet.monadexplorer.com/tx/0xf3ba5d3b1dd25d37ca497ac59978e20c8f02b1d486bbcc529b53fa44346f4bf1) (block `45383155`) |
-| Registry runtime hash     | `0xbeba792ad0de3adb3698cdfb49cb439a65736c88289f2e824edcc943f0407199`                                                                         |
-| Example target (GasProbe) | [`0xDe7D3BA3A42643164378fa64B72dA5cBe9C9369c`](https://testnet.monadexplorer.com/address/0xDe7D3BA3A42643164378fa64B72dA5cBe9C9369c)         |
-| Example runtime hash      | `0x90857816f72eedd2d66537f6c9ecf19a9e7eb4b8c697c14972a8f0ae0352ef30` (`1,407` bytes)                                                         |
-| First public seal         | `0x53d2b1c05305211e12e191e76c95e3e88119a1d9b5d14c60131695940b31abec`                                                                         |
-| First seal transaction    | [`0xf043…ef816`](https://testnet.monadexplorer.com/tx/0xf04316621c91c6292a8e6f6149d9d5ad38e274efd637a72f2b30bc53357ef816) (block `45389663`) |
-
-The first seal records the GasProbe target above, its observed runtime hash, the selected artifact file hash, the deterministic release ID, and issuer `0x95A11471a92cF989b4f0a89330BcA619F887799E`.
-
-## How it works
-
-### Compare locally, read live code
-
-The browser parses a Foundry artifact locally. It computes:
-
-- the complete artifact file hash;
-- the runtime hash from the artifact's deployed bytecode; and
-- a release ID derived from that artifact hash.
-
-It then makes a fresh Monad RPC read for the target's code. Matching runtime hashes and byte counts create a reproducible, visible comparison. No artifact is uploaded to a ReleaseSeal server.
-
-### Seal onchain
-
-`ReleaseSealRegistry` is a small ownerless Solidity registry. Before it records a seal, it rejects:
-
-- a target address with no code;
-- zero evidence values;
-- a claimed runtime hash different from the target's current `EXTCODEHASH`; and
-- a duplicate seal from the same issuer for the same exact evidence.
-
-The seal ID is deterministically derived from the chain, registry, issuer, target, runtime hash, artifact hash, and release ID. The later **Record** view reads a seal without a wallet and compares its stored runtime hash against a newly fetched target code hash.
-
-## Run locally
-
-Requirements: Node.js `20.9+`, npm, and (for contract work) Foundry.
+No environment variables or API keys are required for the read-only flow.
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000`. No environment variables or API keys are needed for the comparison flow.
+Open `http://localhost:3000`, then choose **VERIFY RELEASESEAL ITSELF**. That loads the checked-in artifact for the deployed registry and performs fresh Monad and Sourcify reads. Your own artifact never leaves the browser.
 
-Select **Verify ReleaseSeal itself** for the zero-setup live proof path. The bundled input is the genuine Foundry artifact that produced the deployed registry runtime; the result still comes from fresh Monad and Sourcify reads.
+To compare another release, choose a standard Foundry artifact JSON and enter the deployed Monad Testnet address. A wallet is only needed to publish a matching result.
 
-To use the example locally, select `contracts/out/GasProbe.sol/GasProbe.json` after compiling contracts, then enter:
+## Publication and finality
 
-```text
-0xDe7D3BA3A42643164378fa64B72dA5cBe9C9369c
-```
+ReleaseSeal does not call a transaction “final” just because a wallet receipt is available. After a transaction is included, the app waits until Monad reports a finalized block at or after the receipt block. It then opens `/seal/[id]`, the public record URL.
 
-For the read-only proof path, open **Record** and select **Load first testnet seal**.
+That record contains:
 
-## Verification commands
+- the event transaction and recorded timestamp;
+- issuer, target, release ID, artifact file hash, and stored runtime hash;
+- the seal block and the block used for the current finalized code read;
+- fresh Sourcify and proxy evidence; and
+- an optional local artifact reproduction check that compares both the full artifact file hash and parsed runtime hash with the stored evidence.
+
+## Live Monad Testnet evidence
+
+| Evidence               | Value                                                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Network                | Monad Testnet (`10143`)                                                                                                              |
+| Registry               | [`0x34e6115D585A22B176Cb4F664da389aB8cC8b7b4`](https://testnet.monadexplorer.com/address/0x34e6115D585A22B176Cb4F664da389aB8cC8b7b4) |
+| Registry deployment    | [`0xf3ba…f4bf1`](https://testnet.monadexplorer.com/tx/0xf3ba5d3b1dd25d37ca497ac59978e20c8f02b1d486bbcc529b53fa44346f4bf1)            |
+| Registry runtime hash  | `0xbeba792ad0de3adb3698cdfb49cb439a65736c88289f2e824edcc943f0407199`                                                                 |
+| First public seal      | `0x53d2b1c05305211e12e191e76c95e3e88119a1d9b5d14c60131695940b31abec`                                                                 |
+| First seal transaction | [`0xf043…ef816`](https://testnet.monadexplorer.com/tx/0xf04316621c91c6292a8e6f6149d9d5ad38e274efd637a72f2b30bc53357ef816)            |
+
+## How it works
+
+1. The browser parses a Foundry artifact locally and derives the full artifact-file hash, runtime hash, and deterministic release ID.
+2. ReleaseSeal fetches the target bytecode at a specific Monad `finalized` block, then performs a byte-for-byte runtime comparison.
+3. If runtime equality and Sourcify’s exact runtime match both hold, the wallet flow simulates the exact registry call before it can request a signature.
+4. The ownerless `ReleaseSealRegistry` independently checks `target.codehash`, rejects mismatches and duplicate evidence, and emits the `ReleaseSealed` event.
+5. The record route reads that event and stored seal back from Monad, then refreshes the target evidence at a new finalized block.
+
+## Contract boundaries
+
+The registry verifies the target’s live code hash at the moment it seals. It does **not** audit the source code or independently recover the original local artifact.
+
+- Artifact file hashes and release IDs are issuer-supplied provenance values.
+- Sourcify is a separate verification service; its result is displayed independently.
+- If Sourcify detects a proxy, ReleaseSeal warns that the compared bytes are the proxy address’s runtime, not the implementation behind it.
+- Code may change after a seal; the public record always performs a fresh finalized-block read.
+- The registry and example seal are on Monad **Testnet**, not mainnet.
+
+## Development and verification
+
+Requirements: Node.js `20.9+`, npm, and Foundry for Solidity work.
 
 ```bash
 npm run format:check
@@ -94,22 +86,17 @@ npm run contracts:build
 npm run contracts:test
 ```
 
-## Project structure
+GitHub Actions repeats those web and contract checks on pushes to `main` and pull requests.
+
+## Repository layout
 
 ```text
-src/components/        comparison, wallet gate, and record UI
-src/lib/               artifact parsing, deterministic comparison, Sourcify, registry reads
-contracts/src/         ReleaseSealRegistry Solidity contract
-contracts/test/        deterministic contract tests and fuzz coverage
-contracts/script/      Monad Testnet deployment script
+src/components/       comparison, wallet publication, and shareable record UI
+src/lib/              artifact parsing, deterministic comparison, RPC/Sourcify reads
+src/app/seal/[sealId] public record route
+contracts/src/        ReleaseSealRegistry Solidity contract
+contracts/test/       contract test coverage
+public/artifacts/     checked-in artifact used by the zero-setup self-check
 ```
 
-## Important boundaries
-
-ReleaseSeal is release evidence, not a security audit or a safety verdict.
-
-- A runtime match does **not** mean the contract is safe, correct, or approved.
-- Artifact file hashes and release IDs are issuer-submitted provenance data; the registry independently verifies only the target's live runtime hash at sealing time.
-- `SOURCE VERIFIED` is a separate third-party Sourcify result, not a claim made by the registry.
-- A target contract can change after a seal is recorded. The Record view therefore performs a fresh code read and reports whether the current code still matches the stored runtime hash.
-- The deployed registry and example seal are on Monad **Testnet**, not mainnet.
+Released under the [MIT License](LICENSE).
