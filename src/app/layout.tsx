@@ -6,8 +6,9 @@ import { Providers } from "@/components/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Gas Mirror — Monad calibration evidence",
-  description: "A live evidence ledger for one Monad gas calibration call.",
+  title: "ReleaseSeal — Compare a build with live Monad code",
+  description:
+    "Deterministically compare a Foundry artifact with runtime bytecode deployed on Monad.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

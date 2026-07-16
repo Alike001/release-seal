@@ -1,5 +1,5 @@
-import { GasMirror } from "@/components/gas-mirror";
+import { ReleaseComparator } from "@/components/release-comparator";
 
 export default function Page() {
-  return <GasMirror />;
+  return <ReleaseComparator />;
 }
